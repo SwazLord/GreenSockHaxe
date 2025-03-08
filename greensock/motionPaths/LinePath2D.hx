@@ -1,30 +1,121 @@
+/**
+ * VERSION: 0.5
+ * DATE: 2012-02-16
+ * AS3
+ * UPDATES AND DOCS AT: http://www.greensock.com
+ **/
 package com.greensock.motionPaths;
 
-import flash.display.Graphics;
-import flash.events.Event;
-import flash.geom.Matrix;
-import flash.geom.Point;
+import as3hx.Compat;
+import openfl.display.Graphics;
+import openfl.events.Event;
+import openfl.geom.Matrix;
+import openfl.geom.Point;
 
 
+/**
+ * [AS3 only] A LinePath2D defines a path (using as many Points as you want) on which a PathFollower can be 
+ * placed and animated. A PathFollower's position along the path is described using the PathFollower's 
+ * <code>progress</code> property, a value between 0 and 1 where 0 is at the beginning of the path, 
+ * 0.5 is in the middle, and 1 is at the very end. To tween a PathFollower along the path, simply tween its
+ * <code>progress</code> property. To tween ALL of the followers on the path at once, you can tween the 
+ * LinePath2D's <code>progress</code> property which performs better than tweening every PathFollower's 
+ * <code>progress</code> property individually. PathFollowers automatically wrap so that if the 
+ * <code>progress</code> value exceeds 1 it continues at the beginning of the path, meaning that tweening
+ * its <code>progress</code> from 0 to 2 would have the same effect as tweening it from 0 to 1 twice 
+ * (it would appear to loop).
+ *  
+ * <p>Since LinePath2D extends the Shape class, you can add an instance to the display list to see a line representation
+ * of the path drawn which can be particularly helpful during the production phase. Use <code>lineStyle()</code> 
+ * to adjust the color, thickness, and other attributes of the line that is drawn (or set the LinePath2D's 
+ * <code>visible</code> property to false or don't add it to the display list if you don't want to see the line 
+ * at all). You can also adjust all of its properties like <code>scaleX, scaleY, rotation, width, height, x,</code> 
+ * and <code>y</code>. That means you can tween those values as well to achieve very dynamic, complex effects 
+ * with ease.</p>
+ * 
+ * <listing version="3.0">
+import com.greensock.~~;
+import com.greensock.easing.~~;
+import com.greensock.motionPaths.~~;
+import openfl.geom.Point;
+
+//create a LinePath2D with 5 Points
+var path:LinePath2D = new LinePath2D([new Point(0, 0), 
+									  new Point(100, 100), 
+									  new Point(350, 150),
+									  new Point(50, 200),
+									  new Point(550, 400)]);
+
+//add it to the display list so we can see it (you can skip this if you prefer)
+addChild(path);
+
+//create an array containing 30 blue squares
+var boxes:Array = [];
+for (var i:int = 0; i &lt; 30; i++) {
+	boxes.push(createSquare(10, 0x0000FF));
+}
+
+//distribute the blue squares evenly across the entire path and set them to autoRotate
+path.distribute(boxes, 0, 1, true);
+
+//put a red square exactly halfway through the 2nd segment
+path.addFollower(createSquare(10, 0xFF0000), path.getSegmentProgress(2, 0.5));
+
+//tween all of the squares through the path once (wrapping when they reach the end)
+TweenMax.to(path, 20, {progress:1});
+
+//while the squares are animating through the path, tween the path's position and rotation too!
+TweenMax.to(path, 3, {rotation:180, x:550, y:400, ease:Back.easeOut, delay:3});
+
+//method for creating squares
+function createSquare(size:Number, color:uint=0xFF0000):Shape {
+	var s:Shape = new Shape();
+	s.graphics.beginFill(color, 1);
+	s.graphics.drawRect(-size / 2, -size / 2, size, size);
+	s.graphics.endFill();
+	this.addChild(s);
+	return s;
+}
+</listing>
+ * 
+ * <p><strong>NOTES</strong></p>
+ * <ul>
+ * 		<li>All followers' positions are automatically updated when you alter the MotionPath that they're following.</li>
+ * 		<li>To tween all followers along the path at once, simply tween the MotionPath's <code>progress</code> 
+ * 			property which will provide better performance than tweening each follower independently.</li>
+ * </ul>
+ * 
+ * <p><strong>Copyright 2010-2014, GreenSock. All rights reserved.</strong> This work is subject to the terms in <a href="http://www.greensock.com/terms_of_use.html">http://www.greensock.com/terms_of_use.html</a> or for <a href="http://www.greensock.com/club/">Club GreenSock</a> members, the software agreement that was issued with the membership.</p>
+ * 
+ * @author Jack Doyle, jack@greensock.com
+ */
 class LinePath2D extends MotionPath
 {
-    public var points(get, set) : Array<Dynamic>;
     public var totalLength(get, never) : Float;
+    public var points(get, set) : Array<Dynamic>;
 
-    
-    
-    private var _points : Array<Dynamic>;
-    
-    private var _totalLength : Float;
-    
-    public var autoUpdatePoints : Bool;
-    
-    private var _hasAutoRotate : Bool;
-    
+    /** @private **/
     private var _first : PathPoint;
-    
+    /** @private **/
+    private var _points : Array<Dynamic>;
+    /** @private **/
+    private var _totalLength : Float;
+    /** @private **/
+    private var _hasAutoRotate : Bool;
+    /** @private **/
     private var _prevMatrix : Matrix;
     
+    /** If true, the LinePath2D will analyze every Point whenever it renders to see if any Point's x or y value has changed, thus making it possible to tween them dynamically. Setting <code>autoUpdatePoints</code> to <code>true</code> increases the CPU load due to the extra processing, so only set it to <code>true</code> if you plan to change one or more of the Points' position. **/
+    public var autoUpdatePoints : Bool;
+    
+    /**
+		 * Constructor
+		 * 
+		 * @param points An array of Points that define the line
+		 * @param x The x coordinate of the origin of the line
+		 * @param y The y coordinate of the origin of the line
+		 * @param autoUpdatePoints If true, the LinePath2D will analyze every Point whenever it renders to see if any Point's x or y value has changed, thus making it possible to tween them dynamically. Setting <code>autoUpdatePoints</code> to <code>true</code> increases the CPU load due to the extra processing, so only set it to <code>true</code> if you plan to change one or more of the Points' position.
+		 */
     public function new(points : Array<Dynamic> = null, x : Float = 0, y : Float = 0, autoUpdatePoints : Bool = false)
     {
         super();
@@ -39,9 +130,109 @@ class LinePath2D extends MotionPath
         super.y = y;
     }
     
+    /** 
+		 * Adds a Point to the end of the current LinePath2D (essentially redefining its end point).
+		 * 
+		 * @param point A Point describing the local coordinates through which the line should be drawn.
+		 **/
+    public function appendPoint(point : Point) : Void
+    {
+        _insertPoint(point, _points.length, false);
+    }
+    
+    /** 
+		 * Inserts a Point at a particular index value in the <code>points</code> array, similar to splice() in an array.
+		 * For example, if a LinePath2D instance has 3 Points already and you want to insert a new Point right after the
+		 * first one, you would do:
+		 * <listing version="3.0">
+var path:LinePath2D = new LinePath2D([new Point(0, 0), 
+								 new Point(100, 50), 
+								 new Point(200, 300)]); 
+path.insertPoint(new Point(50, 50), 1); 
+</listing>
+		 * 
+		 * @param point A Point describing the local coordinates through which the line should be drawn.
+		 * @param index The index value in the <code>points</code> array at which the Point should be inserted.
+		 **/
+    public function insertPoint(point : Point, index : Int = 0) : Void
+    {
+        _insertPoint(point, index, false);
+    }
+    
+    /** @private **/
+    private function _insertPoint(point : Point, index : Int, skipOrganize : Bool) : Void
+    {
+        //Compat.arraySplice(_points, index, 0, [new PathPoint(point)]);
+        _points.insert(index, new PathPoint(point));
+        if (!skipOrganize)
+        {
+            _organize();
+        }
+    }
+    
+    
+    /**
+		 * Appends multiple Points to the end of the <code>points</code> array. Identical to 
+		 * the <code>appendPoint()</code> method, but accepts an array of Points instead of just one.
+		 * 
+		 * @param points An array of Points to append.
+		 */
+    public function appendMultiplePoints(points : Array<Dynamic>) : Void
+    {
+        insertMultiplePoints(points, _points.length);
+    }
+    
+    /**
+		 * Inserts multiple Points into the <code>points</code> array at a particular index/position.
+		 * Identical to the <code>insertPoint()</code> method, but accepts an array of points instead of just one.
+		 * 
+		 * @param points An array of Points to insert.
+		 * @param index The index value in the <code>points</code> array at which the Points should be inserted.
+		 */
+    public function insertMultiplePoints(points : Array<Dynamic>, index : Int = 0) : Void
+    {
+        var l : Int = points.length;
+        for (i in 0...l)
+        {
+            _insertPoint(points[i], index + i, true);
+        }
+        _organize();
+    }
+    
+    /**
+		 * Removes a particular Point instance from the <code>points</code> array.
+		 * 
+		 * @param point The Point object to remove from the <code>points</code> array.
+		 */
+    public function removePoint(point : Point) : Void
+    {
+        var i : Int = _points.length;
+        while (--i > -1)
+        {
+            if (_points[i].point == point)
+            {
+                _points.splice(i, 1);
+            }
+        }
+        _organize();
+    }
+    
+    /**
+		 * Removes the Point that resides at a particular index/position in the <code>points</code> array. 
+		 * Just like in arrays, the index is zero-based. For example, to remove the second Point in the array, 
+		 * do <code>removePointByIndex(1)</code>;
+		 * 
+		 * @param index The index value of the Point that should be removed from the <code>points</code> array.
+		 */
+    public function removePointByIndex(index : Int) : Void
+    {
+        _points.splice(index, 1);
+        _organize();
+    }
+    
+    /** @private **/
     private function _organize() : Void
     {
-        var pp : PathPoint = null;
         _totalLength = 0;
         _hasAutoRotate = false;
         var last : Int = as3hx.Compat.parseInt(_points.length - 1);
@@ -55,6 +246,7 @@ class LinePath2D extends MotionPath
             _first.progress = _first.xChange = _first.yChange = _first.length = 0;
             return;
         }
+        var pp : PathPoint;
         for (i in 0...last + 1)
         {
             if (_points[i] != null)
@@ -79,7 +271,7 @@ class LinePath2D extends MotionPath
         }
         _first = pp = _points[0];
         var curTotal : Float = 0;
-        while (pp)
+        while (pp != null)
         {
             pp.progress = curTotal / _totalLength;
             curTotal += pp.length;
@@ -88,52 +280,106 @@ class LinePath2D extends MotionPath
         _updateAngles();
     }
     
-    private function set_points(value : Array<Dynamic>) : Array<Dynamic>
-    {
-        _points = [];
-        insertMultiplePoints(value, 0);
-        _redrawLine = true;
-        update(null);
-        return value;
-    }
-    
+    /** @private **/
     private function _updateAngles() : Void
     {
         var m : Matrix = this.transform.matrix;
         var pp : PathPoint = _first;
-        while (pp)
+        while (pp != null)
         {
-            pp.angle = Math.atan2(pp.xChange * m.b + pp.yChange * m.d, pp.xChange * m.a + pp.yChange * m.c) * _RAD2DEG;
+            pp.angle = Math.atan2(pp.xChange * m.b + pp.yChange * m.d, pp.xChange * m.a + pp.yChange * m.c) * MotionPath._RAD2DEG;
             pp = pp.next;
         }
         _prevMatrix = m;
     }
     
-    public function getSegmentProgress(segment : Int, progress : Float) : Float
+    /** @inheritDoc **/
+    override public function update(event : Event = null) : Void
     {
-        if (_first == null)
+        if (_first == null || _points.length <= 1)
         {
-            return 0;
+            return;
         }
-        if (_points.length <= segment)
+        var updatedAngles : Bool = false;
+        var px : Float;
+        var py : Float;
+        var pp : PathPoint;
+        var followerProgress : Float;
+        var pathProg : Float;
+        var m : Matrix = this.transform.matrix;
+        var a : Float = m.a;
+        var b : Float = m.b;
+        var c : Float = m.c;
+        var d : Float = m.d;
+        var tx : Float = m.tx;
+        var ty : Float = m.ty;
+        var f : PathFollower = _rootFollower;
+        
+        if (autoUpdatePoints)
         {
-            segment = _points.length;
+            pp = _first;
+            while (pp != null)
+            {
+                if (pp.point.x != pp.x || pp.point.y != pp.y)
+                {
+                    _organize();
+                    _redrawLine = true;
+                    update();
+                    return;
+                }
+                pp = pp.next;
+            }
         }
-        var pp : PathPoint = _points[segment - 1];
-        return pp.progress + progress * pp.length / _totalLength;
+        
+        while (f != null)
+        {
+            followerProgress = f.cachedProgress;
+            pp = _first;
+            while (pp != null && pp.next.progress < followerProgress)
+            {
+                pp = pp.next;
+            }
+            
+            if (pp != null)
+            {
+                pathProg = (followerProgress - pp.progress) / (pp.length / _totalLength);
+                px = pp.x + pathProg * pp.xChange;
+                py = pp.y + pathProg * pp.yChange;
+                f.target.x = px * a + py * c + tx;
+                f.target.y = px * b + py * d + ty;
+                
+                if (f.autoRotate)
+                {
+                    if (!updatedAngles && (_prevMatrix.a != a || _prevMatrix.b != b || _prevMatrix.c != c || _prevMatrix.d != d))
+                    {
+                        _updateAngles();  //only need to update the angles once during the render cycle  
+                        updatedAngles = true;
+                    }
+                    f.target.rotation = pp.angle + f.rotationOffset;
+                }
+            }
+            
+            f = f.cachedNext;
+        }
+        if (_redrawLine)
+        {
+            var g : Graphics = this.graphics;
+            g.clear();
+            g.lineStyle(_thickness, _color, _lineAlpha, _pixelHinting, _scaleMode, _caps, _joints, _miterLimit);
+            pp = _first;
+            g.moveTo(pp.x, pp.y);
+            while (pp != null)
+            {
+                g.lineTo(pp.x, pp.y);
+                pp = pp.next;
+            }
+            _redrawLine = false;
+        }
     }
     
-    public function appendMultiplePoints(points : Array<Dynamic>) : Void
-    {
-        insertMultiplePoints(points, _points.length);
-    }
-    
+    /** @inheritDoc **/
     override public function renderObjectAt(target : Dynamic, progress : Float, autoRotate : Bool = false, rotationOffset : Float = 0) : Void
     {
-        var pathProg : Float = Math.NaN;
-        var px : Float = Math.NaN;
-        var py : Float = Math.NaN;
-        var m : Matrix = null;
         if (progress > 1)
         {
             progress -= as3hx.Compat.parseInt(progress);
@@ -146,19 +392,23 @@ class LinePath2D extends MotionPath
         {
             return;
         }
+        
         var pp : PathPoint = _first;
         while (pp.next != null && pp.next.progress < progress)
         {
             pp = pp.next;
         }
+        
         if (pp != null)
         {
-            pathProg = (progress - pp.progress) / (pp.length / _totalLength);
-            px = pp.x + pathProg * pp.xChange;
-            py = pp.y + pathProg * pp.yChange;
-            m = this.transform.matrix;
+            var pathProg : Float = (progress - pp.progress) / (pp.length / _totalLength);
+            var px : Float = pp.x + pathProg * pp.xChange;
+            var py : Float = pp.y + pathProg * pp.yChange;
+            
+            var m : Matrix = this.transform.matrix;
             target.x = px * m.a + py * m.c + m.tx;
             target.y = px * m.b + py * m.d + m.ty;
+            
             if (autoRotate)
             {
                 if (_prevMatrix.a != m.a || _prevMatrix.b != m.b || _prevMatrix.c != m.c || _prevMatrix.d != m.d)
@@ -170,172 +420,143 @@ class LinePath2D extends MotionPath
         }
     }
     
-    override public function update(event : Event = null) : Void
+    /**
+		 * Translates the progress along a particular segment of the LinePath2D to an overall <code>progress</code>
+		 * value, making it easy to position an object like "halfway along the 2nd segment of the line". For example:
+		 * <p><code>
+		 * 
+		 * path.addFollower(mc, path.getSegmentProgress(2, 0.5));
+		 * 
+		 * </code></p>
+		 * 
+		 * @param segment The segment number of the line. For example, a line defined by 3 Points would have two segments.
+		 * @param progress The <code>progress</code> along the segment. For example, the midpoint of the second segment would be <code>getSegmentProgress(2, 0.5);</code>.
+		 * @return The progress value (between 0 and 1) describing the overall progress on the entire LinePath2D.
+		 */
+    public function getSegmentProgress(segment : Int, progress : Float) : Float
     {
-        var px : Float = Math.NaN;
-        var py : Float = Math.NaN;
-        var pp : PathPoint = null;
-        var followerProgress : Float = Math.NaN;
-        var pathProg : Float = Math.NaN;
-        var g : Graphics = null;
-        if (_first == null || _points.length <= 1)
+        if (_first == null)
         {
-            return;
+            return 0;
         }
-        var updatedAngles : Bool = false;
-        var m : Matrix = this.transform.matrix;
-        var a : Float = m.a;
-        var b : Float = m.b;
-        var c : Float = m.c;
-        var d : Float = m.d;
-        var tx : Float = m.tx;
-        var ty : Float = m.ty;
-        var f : PathFollower = _rootFollower;
-        if (autoUpdatePoints)
+        else if (_points.length <= segment)
         {
-            pp = _first;
-            while (pp)
-            {
-                if (pp.point.x != pp.x || pp.point.y != pp.y)
-                {
-                    _organize();
-                    _redrawLine = true;
-                    update();
-                    return;
-                }
-                pp = pp.next;
-            }
+            segment = _points.length;
         }
-        while (f)
-        {
-            followerProgress = f.cachedProgress;
-            pp = _first;
-            while (pp != null && pp.next.progress < followerProgress)
-            {
-                pp = pp.next;
-            }
-            if (pp != null)
-            {
-                pathProg = (followerProgress - pp.progress) / (pp.length / _totalLength);
-                px = pp.x + pathProg * pp.xChange;
-                py = pp.y + pathProg * pp.yChange;
-                f.target.x = px * a + py * c + tx;
-                f.target.y = px * b + py * d + ty;
-                if (f.autoRotate)
-                {
-                    if (!updatedAngles && (_prevMatrix.a != a || _prevMatrix.b != b || _prevMatrix.c != c || _prevMatrix.d != d))
-                    {
-                        _updateAngles();
-                        updatedAngles = true;
-                    }
-                    f.target.rotation = pp.angle + f.rotationOffset;
-                }
-            }
-            f = f.cachedNext;
-        }
-        if (_redrawLine)
-        {
-            g = this.graphics;
-            g.clear();
-            g.lineStyle(_thickness, _color, _lineAlpha, _pixelHinting, _scaleMode, _caps, _joints, _miterLimit);
-            pp = _first;
-            g.moveTo(pp.x, pp.y);
-            while (pp)
-            {
-                g.lineTo(pp.x, pp.y);
-                pp = pp.next;
-            }
-            _redrawLine = false;
-        }
+        var pp : PathPoint = _points[segment - 1];
+        return pp.progress + ((progress * pp.length) / _totalLength);
     }
     
-    public function appendPoint(point : Point) : Void
+    /**
+		 * Finds the segment associated with a particular a progress value along the entire LinePath2D.
+		 * For example, to find which segment is halfway along the LinePath2D:
+		 * 
+		 * <p><code>
+		 * path.getSegment(0.5);
+		 * </code></p>
+		 * 
+		 * <p>To find the segment associated with the LinePath2D's current <code>progress</code>, simply omit the 
+		 * <code>progress</code> parameter:</p>
+		 * 
+		 * <p><code>
+		 * var curSegment = path.getSegment();
+		 * </code></p>
+		 * 
+		 * @param progress The <code>progress</code> along the entire LinePath2D (a value between 0 and 1). For example, the midpoint would be <code>getSegment(0.5);</code>.
+		 * @return An integer describing the segment number where the first is 1, second is 2, etc.
+		 */
+    public function getSegment(?progress : Float) : Int
     {
-        _insertPoint(point, _points.length, false);
-    }
-    
-    public function insertPoint(point : Point, index : Int = 0) : Void
-    {
-        _insertPoint(point, index, false);
-    }
-    
-    private function _insertPoint(point : Point, index : Int, skipOrganize : Bool) : Void
-    {
-        as3hx.Compat.arraySplice(_points, index, 0, [new PathPoint(point)]);
-        if (!skipOrganize)
+        if (!(progress != null || progress == 0))
         {
-            _organize();
+            progress = _progress;
         }
+        if (_points.length < 2)
+        {
+            return 0;
+        }
+        var l : Int = _points.length;
+        for (i in 1...l)
+        {
+            if (progress < (try cast(_points[i], PathPoint) catch(e:Dynamic) null).progress)
+            {
+                return i;
+            }
+        }
+        return as3hx.Compat.parseInt(_points.length - 1);
     }
     
+    /**
+		 * Allows you to snap an object like a Sprite, Point, MovieClip, etc. to the LinePath2D by determining
+		 * the closest position along the line to the current position of the object. It will automatically
+		 * create a PathFollower instance for the target object and reposition it on the LinePath2D. 
+		 * 
+		 * @param target The target object that should be repositioned onto the LinePath2D.
+		 * @param autoRotate When <code>autoRotate</code> is <code>true</code>, the follower will automatically be rotated so that it is oriented to the angle of the path that it is following. To offset this value (like to always add 90 degrees for example), use the <code>rotationOffset</code> property.
+		 * @param rotationOffset When <code>autoRotate</code> is <code>true</code>, this value will always be added to the resulting <code>rotation</code> of the target.
+		 * @return A PathFollower instance that was created for the target.
+		 */
     public function snap(target : Dynamic, autoRotate : Bool = false, rotationOffset : Float = 0) : PathFollower
     {
         return this.addFollower(target, getClosestProgress(target), autoRotate, rotationOffset);
     }
     
-    private function get_points() : Array<Dynamic>
-    {
-        var a : Array<Dynamic> = [];
-        var l : Int = _points.length;
-        for (i in 0...l)
-        {
-            a[i] = _points[i].point;
-        }
-        return a;
-    }
-    
-    public function insertMultiplePoints(points : Array<Dynamic>, index : Int = 0) : Void
-    {
-        var l : Int = points.length;
-        for (i in 0...l)
-        {
-            _insertPoint(points[i], index + i, true);
-        }
-        _organize();
-    }
-    
-    public function removePointByIndex(index : Int) : Void
-    {
-        _points.splice(index, 1);
-        _organize();
-    }
-    
+    /**
+		 * Finds the closest overall <code>progress</code> value on the LinePath2D based on the 
+		 * target object's current position (<code>x</code> and <code>y</code> properties). For example,
+		 * to position the mc object on the LinePath2D at the spot that's closest to the Point x:100, y:50, 
+		 * you could do:<p><code>
+		 * 
+		 * path.addFollower(mc, path.getClosestProgress(new Point(100, 50)));
+		 * 
+		 * </code></p>
+		 * 
+		 * @param target The target object whose position (x/y property values) are analyzed for proximity to the LinePath2D.
+		 * @return The overall <code>progress</code> value describing the position on the LinePath2D that is closest to the target's current position.
+		 */
     public function getClosestProgress(target : Dynamic) : Float
     {
-        var closestPath : PathPoint = null;
-        var dxTarg : Float = Math.NaN;
-        var dyTarg : Float = Math.NaN;
-        var dxNext : Float = Math.NaN;
-        var dyNext : Float = Math.NaN;
-        var dTarg : Float = Math.NaN;
-        var angle : Float = Math.NaN;
-        var next : PathPoint = null;
-        var curDist : Float = Math.NaN;
         if (_first == null || _points.length == 1)
         {
             return 0;
         }
+        
+        var closestPath : PathPoint;
         var closest : Float = 9999999999;
         var length : Float = 0;
         var halfPI : Float = Math.PI / 2;
+        
         var xTarg : Float = target.x;
         var yTarg : Float = target.y;
         var pp : PathPoint = _first;
-        while (pp)
+        var dxTarg : Float;
+        var dyTarg : Float;
+        var dxNext : Float;
+        var dyNext : Float;
+        var dTarg : Float;
+        var angle : Float;
+        var next : PathPoint;
+        var curDist : Float;
+        while (pp != null)
         {
             dxTarg = xTarg - pp.x;
             dyTarg = yTarg - pp.y;
-            next = (pp.next != null) ? pp.next : pp;
+            next = ((pp.next != null)) ? pp.next : pp;
             dxNext = next.x - pp.x;
             dyNext = next.y - pp.y;
             dTarg = Math.sqrt(dxTarg * dxTarg + dyTarg * dyTarg);
+            
             angle = Math.atan2(dyTarg, dxTarg) - Math.atan2(dyNext, dxNext);
             if (angle < 0)
             {
                 angle = -angle;
             }
+            
             if (angle > halfPI)
+            
+            //obtuse
             {
+                
                 if (dTarg < closest)
                 {
                     closest = dTarg;
@@ -375,76 +596,57 @@ class LinePath2D extends MotionPath
             }
             pp = pp.next;
         }
-        return closestPath.progress + length / _totalLength;
+        
+        return closestPath.progress + (length / _totalLength);
     }
     
+    
+    //---- GETTERS / SETTERS ----------------------------------------------------------------------
+    
+    /** Total length of the LinePath2D as though it were stretched out in a straight, flat line. **/
     private function get_totalLength() : Float
     {
         return _totalLength;
     }
     
-    public function removePoint(point : Point) : Void
+    /** The array of Points through which the LinePath2D is drawn. <strong>IMPORTANT:</strong> Changes to the array are NOT automatically applied or reflected in the LinePath2D - just like the <code>filters</code> property of a DisplayObject, you must set the <code>points</code> property of a LinePath2D directly to ensure that any changes are applied internally. **/
+    private function get_points() : Array<Dynamic>
     {
-        var i : Int = _points.length;
-        while (--i > -1)
-        {
-            if (_points[i].point == point)
-            {
-                _points.splice(i, 1);
-            }
-        }
-        _organize();
-    }
-    
-    public function getSegment(progress : Float = Math.NaN) : Int
-    {
-        if (!(progress || progress == 0))
-        {
-            progress = _progress;
-        }
-        if (_points.length < 2)
-        {
-            return 0;
-        }
+        var a : Array<Dynamic> = [];
         var l : Int = _points.length;
-        for (i in 1...l)
+        for (i in 0...l)
         {
-            if (progress < (try cast(_points[i], PathPoint) catch(e:Dynamic) null).progress)
-            {
-                return i;
-            }
+            a[i] = _points[i].point;
         }
-        return as3hx.Compat.parseInt(_points.length - 1);
+        return a;
+    }
+    private function set_points(value : Array<Dynamic>) : Array<Dynamic>
+    {
+        _points = [];
+        insertMultiplePoints(value, 0);
+        _redrawLine = true;
+        update(null);
+        return value;
     }
 }
 
 
-
 class PathPoint
 {
-    
+    public var x : Float;
+    public var y : Float;
+    public var progress : Float;
+    public var xChange : Float;
+    public var yChange : Float;
+    public var point : Point;
+    public var length : Float;
+    public var angle : Float;
     
     public var next : PathPoint;
     
-    public var length : Float;
-    
-    public var y : Float;
-    
-    public var yChange : Float;
-    
-    public var progress : Float;
-    
-    public var xChange : Float;
-    
-    public var angle : Float;
-    
-    public var point : Point;
-    
-    public var x : Float;
-    
+    @:allow(com.greensock.motionPaths)
     private function new(point : Point)
     {
-        super();
         this.x = point.x;
         this.y = point.y;
         this.point = point;
